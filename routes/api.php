@@ -51,19 +51,16 @@ Route::get('/app/onboarding', function () {
 Route::post('/login', [AuthController::class, 'login']);
 
 Route::options('/meter-photo/{path}', function () {
-   return response('', 200)
-       ->header('Access-Control-Allow-Origin', '*')
-       ->header('Access-Control-Allow-Methods', 'GET, OPTIONS')
-       ->header('Access-Control-Allow-Headers', 'Content-Type, Authorization, ngrok-skip-browser-warning');
+   return response('', 200)->withHeaders(fileCorsHeaders());
 })->where('path', '.*');
 
 Route::get('/meter-photo/{path}', function ($path) {
    $cleanPath = str_replace('readings/', '', $path);
-   $fullPath = storage_path('app/public/readings/' . $cleanPath);
+   $fullPath = resolveSafePath(storage_path('app/public/readings'), $cleanPath);
 
-   if (!file_exists($fullPath)) {
+   if ($fullPath === null) {
        return response()->json(['message' => 'File tidak ditemukan'], 404)
-           ->header('Access-Control-Allow-Origin', '*');
+           ->withHeaders(fileCorsHeaders());
    }
 
    $extension = strtolower(pathinfo($fullPath, PATHINFO_EXTENSION));
@@ -74,23 +71,16 @@ Route::get('/meter-photo/{path}', function ($path) {
        default       => 'application/octet-stream',
    };
 
-   return response()->file($fullPath, [
-       'Content-Type'                 => $mimeType,
-       'Access-Control-Allow-Origin'  => '*',
-       'Access-Control-Allow-Headers' => 'Content-Type, Authorization, ngrok-skip-browser-warning',
-       'Cache-Control'                => 'public, max-age=3600',
-   ]);
+   return response()->file($fullPath, array_merge([
+       'Content-Type'  => $mimeType,
+       'Cache-Control' => 'public, max-age=3600',
+   ], fileCorsHeaders()));
 })->where('path', '.*');
 
 Route::get('/complaint-image/{filename}', function ($filename) {
-   $path = storage_path('app/public/complaints/' . $filename);
-   if (!file_exists($path)) abort(404);
-   return response()->file($path, [
-       'Access-Control-Allow-Origin' => '*',
-       'Access-Control-Allow-Methods' => 'GET, OPTIONS',
-       'Access-Control-Allow-Headers' => '*',
-       'ngrok-skip-browser-warning' => 'true',
-   ]);
+   $path = resolveSafePath(storage_path('app/public/complaints'), $filename);
+   if ($path === null) abort(404);
+   return response()->file($path, fileCorsHeaders());
 });
 
 Route::middleware('auth:sanctum')->group(function () {
@@ -231,42 +221,27 @@ Route::middleware('role:admin,supervisor,petugas')->group(function () {
 
 });
 Route::get('/payment-photo/{filename}', function ($filename) {
-   $path = storage_path('app/public/payments/' . $filename);
+   $path = resolveSafePath(storage_path('app/public/payments'), $filename);
 
-
-   if (!file_exists($path)) {
+   if ($path === null) {
        abort(404);
    }
 
-
-   return response()->file($path, [
-       'Access-Control-Allow-Origin' => '*',
-       'Access-Control-Allow-Methods' => 'GET, OPTIONS',
-       'Access-Control-Allow-Headers' => 'Authorization, Content-Type, ngrok-skip-browser-warning',
-       'ngrok-skip-browser-warning'  => 'true',
-   ]);
+   return response()->file($path, fileCorsHeaders());
 });
 Route::get('/proof/{filename}', function ($filename) {
-   $path = storage_path('app/public/payments/' . $filename);
+   $path = resolveSafePath(storage_path('app/public/payments'), $filename);
 
-
-   if (!file_exists($path)) {
-       return response()->json(['message' => 'Not found'], 404);
+   if ($path === null) {
+       return response()->json(['message' => 'Not found'], 404)
+           ->withHeaders(fileCorsHeaders());
    }
 
-
-   return response()->file($path, [
-       'Access-Control-Allow-Origin'  => '*',
-       'Access-Control-Allow-Methods' => 'GET, OPTIONS',
-       'Access-Control-Allow-Headers' => 'Content-Type, Authorization, ngrok-skip-browser-warning',
-       'ngrok-skip-browser-warning'   => 'true',
-       'Cache-Control'                => 'public, max-age=3600',
-   ]);
+   return response()->file($path, array_merge([
+       'Cache-Control' => 'public, max-age=3600',
+   ], fileCorsHeaders()));
 });
 
 Route::options('/proof/{filename}', function () {
-   return response('', 200)
-       ->header('Access-Control-Allow-Origin', '*')
-       ->header('Access-Control-Allow-Methods', 'GET, OPTIONS')
-       ->header('Access-Control-Allow-Headers', 'Content-Type, Authorization, ngrok-skip-browser-warning');
+   return response('', 200)->withHeaders(fileCorsHeaders());
 });

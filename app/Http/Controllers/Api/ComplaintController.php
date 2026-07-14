@@ -75,6 +75,10 @@ class ComplaintController extends Controller
     {
         $complaint = Complaint::findOrFail($id);
 
+        if ($complaint->user_id !== Auth::id() && Auth::user()->role !== 'admin') {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
         $data = $request->validate([
             'title'        => 'sometimes|required|string|max:255',
             'description'  => 'sometimes|required|string',
@@ -116,6 +120,11 @@ class ComplaintController extends Controller
    public function destroy($id)
    {
        $complaint = Complaint::findOrFail($id);
+
+       if ($complaint->user_id !== Auth::id() && Auth::user()->role !== 'admin') {
+           return response()->json(['message' => 'Unauthorized'], 403);
+       }
+
        if ($complaint->image) Storage::disk('public')->delete($complaint->image);
        $complaint->delete();
 
@@ -126,8 +135,8 @@ class ComplaintController extends Controller
    public function show($id)
     {
         $complaint = Complaint::findOrFail($id);
-        
-        if ($complaint->user_id !== auth()->id()) {
+
+        if ($complaint->user_id !== Auth::id() && Auth::user()->role !== 'admin') {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
