@@ -8,25 +8,8 @@ rules:
     severity: ERROR
     languages: [php]
     patterns:
-      - pattern: function destroy(...)
-      - pattern-not-inside: |
-          function destroy(...) {
-            ...
-            $this->authorize(...);
-            ...
-          }
-      - pattern-not-inside: |
-          function destroy(...) {
-            ...
-            Gate::authorize(...);
-            ...
-          }
-      - pattern-not-inside: |
-          function destroy(...) {
-            ...
-            abort_unless(...);
-            ...
-          }
+      - pattern-regex: "function\\s+destroy\\s*\\([^)]*\\)\\s*\\{(?s:.*?)\\}"
+      - pattern-not-regex: "(?:\\$this->authorize\\s*\\(|Gate::authorize\\s*\\(|abort_unless\\s*\\()"
     metadata:
       category: security
       cwe: "CWE-862: Missing Authorization"
@@ -37,25 +20,8 @@ rules:
     severity: ERROR
     languages: [php]
     patterns:
-      - pattern: function update(...)
-      - pattern-not-inside: |
-          function update(...) {
-            ...
-            $this->authorize(...);
-            ...
-          }
-      - pattern-not-inside: |
-          function update(...) {
-            ...
-            Gate::authorize(...);
-            ...
-          }
-      - pattern-not-inside: |
-          function update(...) {
-            ...
-            abort_unless(...);
-            ...
-          }
+      - pattern-regex: "function\\s+update\\s*\\([^)]*\\)\\s*\\{(?s:.*?)\\}"
+      - pattern-not-regex: "(?:\\$this->authorize\\s*\\(|Gate::authorize\\s*\\(|abort_unless\\s*\\()"
     metadata:
       category: security
       cwe: "CWE-862: Missing Authorization"
@@ -66,25 +32,8 @@ rules:
     severity: WARNING
     languages: [php]
     patterns:
-      - pattern: function show(...)
-      - pattern-not-inside: |
-          function show(...) {
-            ...
-            $this->authorize(...);
-            ...
-          }
-      - pattern-not-inside: |
-          function show(...) {
-            ...
-            Gate::authorize(...);
-            ...
-          }
-      - pattern-not-inside: |
-          function show(...) {
-            ...
-            abort_unless(...);
-            ...
-          }
+      - pattern-regex: "function\\s+show\\s*\\([^)]*\\)\\s*\\{(?s:.*?)\\}"
+      - pattern-not-regex: "(?:\\$this->authorize\\s*\\(|Gate::authorize\\s*\\(|abort_unless\\s*\\()"
     metadata:
       category: security
       cwe: "CWE-862: Missing Authorization"
@@ -136,19 +85,8 @@ rules:
     severity: ERROR
     languages: [php]
     patterns:
-      - pattern-inside: |
-          function calculateUsage(...) {
-            ...
-          }
-      - pattern: MeterReading::where('meter_id', $METER)->where('status', 'checked')->orderBy('recorded_at', 'desc')->limit(2)->get()
-      - pattern-not-inside: |
-          function calculateUsage(...) {
-            ...
-            ->where('recorded_at', '>=', ...)
-            ...
-            ->where('recorded_at', '<=', ...)
-            ...
-          }
+      - pattern-regex: "function\\s+calculateUsage\\s*\\([^)]*\\)\\s*\\{(?s:.*?)\\}"
+      - pattern-not-regex: "where\\s*\\(\\s*['\"]recorded_at['\"]\\s*,\\s*['\"]>=['\"]"
     metadata:
       category: security
       cwe: "CWE-200: Exposure of Sensitive Information to an Unauthorized Actor"
@@ -216,19 +154,8 @@ rules:
     severity: ERROR
     languages: [php]
     patterns:
-      - pattern: function notifyTenant(...)
-      - pattern-not-inside: |
-          function notifyTenant(...) {
-            ...
-            $this->authorize(...);
-            ...
-          }
-      - pattern-not-inside: |
-          function notifyTenant(...) {
-            ...
-            abort_unless(...);
-            ...
-          }
+      - pattern-regex: "function\\s+notifyTenant\\s*\\([^)]*\\)\\s*\\{(?s:.*?)\\}"
+      - pattern-not-regex: "(?:\\$this->authorize\\s*\\(|Gate::authorize\\s*\\(|abort_unless\\s*\\(|throttle\\s*\\()"
     metadata:
       category: security
       cwe: "CWE-862: Missing Authorization"
@@ -259,13 +186,8 @@ rules:
     severity: ERROR
     languages: [php]
     patterns:
-      - pattern-inside: |
-          Schema::create('invoices', function (Blueprint $table) {
-            ...
-          }
-      - pattern: $TABLE->string('invoice_number')
-      - pattern-not: $TABLE->string('invoice_number')->unique()
-      - pattern-not: $TABLE->unique('invoice_number')
+      - pattern-regex: "Schema::create\\(['\"]invoices['\"]\\s*,\\s*function\\s*\\(Blueprint\\s*\\$table\\)\\s*\\{(?s:.*?)\\}\\s*\\)"
+      - pattern-not-regex: "unique\\s*\\(\\s*['\"]invoice_number['\"]\\s*\\)|string\\s*\\(\\s*['\"]invoice_number['\"]\\s*\\)\\s*->\\s*unique"
     metadata:
       category: security
       cwe: "CWE-1284: Improper Validation of Specified Quantity in Input"
@@ -279,13 +201,8 @@ rules:
     severity: ERROR
     languages: [php]
     patterns:
-      - pattern-inside: |
-          Schema::create('invoices', function (Blueprint $table) {
-            ...
-          }
-      - pattern: $TABLE->date('billing_period_start')
-      - pattern-not: $TABLE->unique(['unit_id', 'billing_period_start'])
-      - pattern-not: $TABLE->unique(['unit_id', 'billing_period_start', ...])
+      - pattern-regex: "Schema::create\\(['\"]invoices['\"]\\s*,\\s*function\\s*\\(Blueprint\\s*\\$table\\)\\s*\\{(?s:.*?)\\}\\s*\\)"
+      - pattern-not-regex: "unique\\s*\\(\\s*\\[\\s*['\"]unit_id['\"]\\s*,\\s*['\"]billing_period_start['\"]"
     metadata:
       category: security
       cwe: "CWE-1284: Improper Validation of Specified Quantity in Input"
@@ -299,12 +216,8 @@ rules:
     severity: WARNING
     languages: [php]
     patterns:
-      - pattern-inside: |
-          Schema::create('payments', function (Blueprint $table) {
-            ...
-          }
-      - pattern-not: $TABLE->softDeletes()
-      - pattern: $TABLE->id()
+      - pattern-regex: "Schema::create\\(['\"]payments['\"]\\s*,\\s*function\\s*\\(Blueprint\\s*\\$table\\)\\s*\\{(?s:.*?)\\}\\s*\\)"
+      - pattern-not-regex: "softDeletes\\s*\\("
     metadata:
       category: security
       cwe: "CWE-451: User Interface Misrepresentation of Critical Information"
@@ -318,12 +231,8 @@ rules:
     severity: WARNING
     languages: [php]
     patterns:
-      - pattern-inside: |
-          Schema::create('invoices', function (Blueprint $table) {
-            ...
-          }
-      - pattern-not: $TABLE->softDeletes()
-      - pattern: $TABLE->id()
+      - pattern-regex: "Schema::create\\(['\"]invoices['\"]\\s*,\\s*function\\s*\\(Blueprint\\s*\\$table\\)\\s*\\{(?s:.*?)\\}\\s*\\)"
+      - pattern-not-regex: "softDeletes\\s*\\("
     metadata:
       category: security
       cwe: "CWE-451: User Interface Misrepresentation of Critical Information"
@@ -337,12 +246,8 @@ rules:
     severity: WARNING
     languages: [php]
     patterns:
-      - pattern-inside: |
-          Schema::create('complaints', function (Blueprint $table) {
-            ...
-          }
-      - pattern: $TABLE->string('role')
-      - pattern-not: $TABLE->enum('role', [...])
+      - pattern-regex: "Schema::create\\(['\"]complaints['\"]\\s*,\\s*function\\s*\\(Blueprint\\s*\\$table\\)\\s*\\{(?s:.*?)\\}\\s*\\)"
+      - pattern-not-regex: "enum\\s*\\(\\s*['\"]role['\"]"
     metadata:
       category: security
       cwe: "CWE-20: Improper Input Validation"
@@ -356,12 +261,8 @@ rules:
     severity: WARNING
     languages: [php]
     patterns:
-      - pattern-inside: |
-          Schema::create('complaints', function (Blueprint $table) {
-            ...
-          }
-      - pattern: $TABLE->string('reported_by')
-      - pattern-not: $TABLE->foreignId('reported_by')
+      - pattern-regex: "Schema::create\\(['\"]complaints['\"]\\s*,\\s*function\\s*\\(Blueprint\\s*\\$table\\)\\s*\\{(?s:.*?)\\}\\s*\\)"
+      - pattern-not-regex: "foreignId\\s*\\(\\s*['\"]reported_by['\"]"
     metadata:
       category: security
       cwe: "CWE-20: Improper Input Validation"
@@ -375,12 +276,8 @@ rules:
     severity: INFO
     languages: [php]
     patterns:
-      - pattern-inside: |
-          Schema::table('utility_meters', function (Blueprint $table) {
-            ...
-          }
-      - pattern: $TABLE->decimal('multiplier', ...)
-      - pattern-not: $TABLE->decimal('multiplier', ...)->default(...)
+      - pattern-regex: "Schema::table\\(['\"]utility_meters['\"]\\s*,\\s*function\\s*\\(Blueprint\\s*\\$table\\)\\s*\\{(?s:.*?)\\}\\s*\\)"
+      - pattern-not-regex: "decimal\\s*\\(\\s*['\"]multiplier['\"]\\s*,.*?\\)\\s*->\\s*default"
     metadata:
       category: correctness
       vulnerability: multiplier-missing-default
@@ -394,29 +291,8 @@ rules:
     severity: INFO
     languages: [php]
     patterns:
-      - pattern-either:
-          - pattern: function pdf(...)
-          - pattern: function index(...)
-          - pattern: function create(...)
-          - pattern: function edit(...)
-      - pattern-not-inside: |
-          function $F(...) {
-            ...
-            $this->authorize(...);
-            ...
-          }
-      - pattern-not-inside: |
-          function $F(...) {
-            ...
-            Gate::authorize(...);
-            ...
-          }
-      - pattern-not-inside: |
-          function $F(...) {
-            ...
-            abort_unless(...);
-            ...
-          }
+      - pattern-regex: "function\\s+(?:pdf|index|create|edit)\\s*\\([^)]*\\)\\s*\\{(?s:.*?)\\}"
+      - pattern-not-regex: "(?:\\$this->authorize\\s*\\(|Gate::authorize\\s*\\(|abort_unless\\s*\\()"
     paths:
       include:
         - "**/app/Http/Controllers/**"
