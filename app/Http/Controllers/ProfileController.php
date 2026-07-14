@@ -44,7 +44,7 @@ class ProfileController extends Controller
 
         $request->user()->save();
 
-        return Redirect::back()->with('status', 'profile-updated');
+        return Redirect::route('profile.edit')->with('status', 'profile-updated');
     }
 
     public function destroy(Request $request): RedirectResponse
