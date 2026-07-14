@@ -1,0 +1,20 @@
+@extends('commercial.layouts.app')
+
+@section('title', 'Braga8 Commercial Center — Modern Commercial Destination for Business & Lifestyle')
+@section('meta_description', '...')
+
+@section('content')
+    @include('commercial.partials.hero')
+    @include('commercial.partials.stats')
+    @include('commercial.partials.about')
+    @include('commercial.partials.facilities')
+    @include('commercial.partials.directory')
+    @include('commercial.partials.leasing')
+    @include('commercial.partials.events')
+    @include('commercial.partials.gallery')
+    @include('commercial.partials.testimonials')
+    @include('commercial.partials.location')
+    @include('commercial.partials.faq')
+    @include('commercial.partials.instagram')
+    @include('commercial.partials.contact')
+@endsection
