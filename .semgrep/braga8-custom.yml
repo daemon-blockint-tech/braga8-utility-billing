@@ -1,0 +1,426 @@
+rules:
+  # ============================================================
+  # Rule 1: Missing authorization on destructive controller methods
+  # Targets: InvoiceController::destroy(), update(), show(), pdf()
+  # ============================================================
+  - id: braga8.controller.missing-authz-destroy
+    message: "destroy() method performs hard delete without authorization check (policy/authorize/gate missing)"
+    severity: ERROR
+    languages: [php]
+    patterns:
+      - pattern: function destroy(...)
+      - pattern-not-inside: |
+          function destroy(...) {
+            ...
+            $this->authorize(...);
+            ...
+          }
+      - pattern-not-inside: |
+          function destroy(...) {
+            ...
+            Gate::authorize(...);
+            ...
+          }
+      - pattern-not-inside: |
+          function destroy(...) {
+            ...
+            abort_unless(...);
+            ...
+          }
+    metadata:
+      category: security
+      cwe: "CWE-862: Missing Authorization"
+      vulnerability: missing-authorization-destroy
+
+  - id: braga8.controller.missing-authz-update
+    message: "update() method modifies resource without authorization check"
+    severity: ERROR
+    languages: [php]
+    patterns:
+      - pattern: function update(...)
+      - pattern-not-inside: |
+          function update(...) {
+            ...
+            $this->authorize(...);
+            ...
+          }
+      - pattern-not-inside: |
+          function update(...) {
+            ...
+            Gate::authorize(...);
+            ...
+          }
+      - pattern-not-inside: |
+          function update(...) {
+            ...
+            abort_unless(...);
+            ...
+          }
+    metadata:
+      category: security
+      cwe: "CWE-862: Missing Authorization"
+      vulnerability: missing-authorization-update
+
+  - id: braga8.controller.missing-authz-show
+    message: "show() method exposes resource without authorization check"
+    severity: WARNING
+    languages: [php]
+    patterns:
+      - pattern: function show(...)
+      - pattern-not-inside: |
+          function show(...) {
+            ...
+            $this->authorize(...);
+            ...
+          }
+      - pattern-not-inside: |
+          function show(...) {
+            ...
+            Gate::authorize(...);
+            ...
+          }
+      - pattern-not-inside: |
+          function show(...) {
+            ...
+            abort_unless(...);
+            ...
+          }
+    metadata:
+      category: security
+      cwe: "CWE-862: Missing Authorization"
+      vulnerability: missing-authorization-show
+
+  # ============================================================
+  # Rule 2: Hard delete without soft deletes (destroy uses ->delete() on model)
+  # ============================================================
+  - id: braga8.controller.hard-delete-no-softdelete
+    message: "Hard delete via ->delete() — verify model uses SoftDeletes to prevent data loss"
+    severity: WARNING
+    languages: [php]
+    patterns:
+      - pattern-inside: |
+          function destroy(...) {
+            ...
+          }
+      - pattern: $MODEL->delete();
+    metadata:
+      category: security
+      cwe: "CWE-451: User Interface Misrepresentation of Critical Information"
+      vulnerability: hard-delete-without-softdelete
+
+  # ============================================================
+  # Rule 3: invoice_number collision risk — low entropy generation
+  # Detects bin2hex(random_bytes(4)) or similar low-entropy invoice number generation
+  # ============================================================
+  - id: braga8.invoice.low-entropy-invoice-number
+    message: "invoice_number generated from only 4 random bytes (32-bit entropy) — high collision risk, use UUID or longer random"
+    severity: WARNING
+    languages: [php]
+    patterns:
+      - pattern-either:
+          - pattern: |
+              "'INV-" . bin2hex(random_bytes(4))
+          - pattern: bin2hex(random_bytes(4))
+          - pattern: strtoupper(bin2hex(random_bytes(4)))
+    metadata:
+      category: security
+      cwe: "CWE-330: Use of Insufficiently Random Values"
+      vulnerability: low-entropy-invoice-number
+
+  # ============================================================
+  # Rule 4: Unscoped meter reading query in calculateUsage
+  # Queries MeterReading by meter_id only, without billing period filter
+  # ============================================================
+  - id: braga8.invoice.unscoped-calculate-usage
+    message: "MeterReading query in calculateUsage() is not scoped to billing period — may pick readings from wrong period"
+    severity: ERROR
+    languages: [php]
+    patterns:
+      - pattern-inside: |
+          function calculateUsage(...) {
+            ...
+          }
+      - pattern: MeterReading::where('meter_id', $METER)->where('status', 'checked')->orderBy('recorded_at', 'desc')->limit(2)->get()
+      - pattern-not-inside: |
+          function calculateUsage(...) {
+            ...
+            ->where('recorded_at', '>=', ...)
+            ...
+            ->where('recorded_at', '<=', ...)
+            ...
+          }
+    metadata:
+      category: security
+      cwe: "CWE-200: Exposure of Sensitive Information to an Unauthorized Actor"
+      vulnerability: unscoped-usage-calculation
+
+  # ============================================================
+  # Rule 5: Missing duplicate invoice check in store()
+  # store() should check for existing invoice with same unit_id + billing_period
+  # ============================================================
+  - id: braga8.invoice.missing-duplicate-check
+    message: "Invoice store() does not check for existing invoice with same unit_id and billing period — allows duplicate billing"
+    severity: ERROR
+    languages: [php]
+    patterns:
+      - pattern-inside: |
+          function store(...) {
+            ...
+          }
+      - pattern: Invoice::create(...)
+      - pattern-not-inside: |
+          function store(...) {
+            ...
+            Invoice::where('unit_id', ...)->where('billing_period_start', ...)->exists();
+            ...
+          }
+      - pattern-not-inside: |
+          function store(...) {
+            ...
+            Invoice::where('unit_id', ...)->where('billing_period_start', ...)->first();
+            ...
+          }
+    metadata:
+      category: security
+      cwe: "CWE-697: Incorrect Comparison"
+      vulnerability: missing-duplicate-invoice-check
+
+  # ============================================================
+  # Rule 6: Minimal validation in store() — only tenant_id and unit_id
+  # ============================================================
+  - id: braga8.invoice.minimal-store-validation
+    message: "Invoice store() validation is minimal — missing billing_period_start, billing_period_end, amount, due_date validation"
+    severity: WARNING
+    languages: [php]
+    patterns:
+      - pattern-inside: |
+          function store(Request $REQUEST) {
+            ...
+            $VALIDATED = $REQUEST->validate([
+              'tenant_id' => '...',
+              'unit_id' => '...',
+            ]);
+            ...
+          }
+      - pattern: $REQUEST->validate([...])
+    metadata:
+      category: security
+      cwe: "CWE-20: Improper Input Validation"
+      vulnerability: minimal-store-validation
+
+  # ============================================================
+  # Rule 7: notifyTenant() lacks role/auth guard and throttling
+  # ============================================================
+  - id: braga8.invoice.notify-tenant-no-guard
+    message: "notifyTenant() method lacks role middleware/auth guard and has no rate throttling — any authenticated user can trigger notifications"
+    severity: ERROR
+    languages: [php]
+    patterns:
+      - pattern: function notifyTenant(...)
+      - pattern-not-inside: |
+          function notifyTenant(...) {
+            ...
+            $this->authorize(...);
+            ...
+          }
+      - pattern-not-inside: |
+          function notifyTenant(...) {
+            ...
+            abort_unless(...);
+            ...
+          }
+    metadata:
+      category: security
+      cwe: "CWE-862: Missing Authorization"
+      vulnerability: notify-tenant-no-authz
+
+  # ============================================================
+  # Rule 8: External redirect to WhatsApp URL without validation
+  # ============================================================
+  - id: braga8.invoice.external-whatsapp-redirect
+    message: "Redirect to external WhatsApp URL — verify target URL is validated and not user-controlled (open redirect / SSRF risk)"
+    severity: WARNING
+    languages: [php]
+    patterns:
+      - pattern: Redirect::to('https://wa.me/' . $PHONE)
+      - pattern-either:
+          - pattern: redirect('https://wa.me/' . $PHONE)
+          - pattern: Redirect::to('https://wa.me/' . $PHONE)
+    metadata:
+      category: security
+      cwe: "CWE-601: URL Redirection to Untrusted Site (Open Redirect)"
+      vulnerability: external-whatsapp-redirect
+
+  # ============================================================
+  # Rule 9: Migration — invoices table missing unique on invoice_number
+  # ============================================================
+  - id: braga8.migration.invoices-missing-unique-invoice-number
+    message: "invoices table migration does not define unique constraint on invoice_number — allows duplicate invoice numbers"
+    severity: ERROR
+    languages: [php]
+    patterns:
+      - pattern-inside: |
+          Schema::create('invoices', function (Blueprint $table) {
+            ...
+          }
+      - pattern: $TABLE->string('invoice_number')
+      - pattern-not: $TABLE->string('invoice_number')->unique()
+      - pattern-not: $TABLE->unique('invoice_number')
+    metadata:
+      category: security
+      cwe: "CWE-1284: Improper Validation of Specified Quantity in Input"
+      vulnerability: missing-unique-invoice-number
+
+  # ============================================================
+  # Rule 10: Migration — invoices table missing composite unique (unit_id, billing_period_start)
+  # ============================================================
+  - id: braga8.migration.invoices-missing-composite-unique
+    message: "invoices table migration does not define composite unique on (unit_id, billing_period_start) — allows duplicate invoices per period"
+    severity: ERROR
+    languages: [php]
+    patterns:
+      - pattern-inside: |
+          Schema::create('invoices', function (Blueprint $table) {
+            ...
+          }
+      - pattern: $TABLE->date('billing_period_start')
+      - pattern-not: $TABLE->unique(['unit_id', 'billing_period_start'])
+      - pattern-not: $TABLE->unique(['unit_id', 'billing_period_start', ...])
+    metadata:
+      category: security
+      cwe: "CWE-1284: Improper Validation of Specified Quantity in Input"
+      vulnerability: missing-composite-unique-invoices
+
+  # ============================================================
+  # Rule 11: Migration — payments table missing softDeletes
+  # ============================================================
+  - id: braga8.migration.payments-missing-soft-deletes
+    message: "payments table migration does not define softDeletes() — payment records cannot be retained for audit after deletion"
+    severity: WARNING
+    languages: [php]
+    patterns:
+      - pattern-inside: |
+          Schema::create('payments', function (Blueprint $table) {
+            ...
+          }
+      - pattern-not: $TABLE->softDeletes()
+      - pattern: $TABLE->id()
+    metadata:
+      category: security
+      cwe: "CWE-451: User Interface Misrepresentation of Critical Information"
+      vulnerability: payments-missing-soft-deletes
+
+  # ============================================================
+  # Rule 12: Migration — invoices table missing softDeletes
+  # ============================================================
+  - id: braga8.migration.invoices-missing-soft-deletes
+    message: "invoices table migration does not define softDeletes() — invoice records cannot be retained for audit after deletion"
+    severity: WARNING
+    languages: [php]
+    patterns:
+      - pattern-inside: |
+          Schema::create('invoices', function (Blueprint $table) {
+            ...
+          }
+      - pattern-not: $TABLE->softDeletes()
+      - pattern: $TABLE->id()
+    metadata:
+      category: security
+      cwe: "CWE-451: User Interface Misrepresentation of Critical Information"
+      vulnerability: invoices-missing-soft-deletes
+
+  # ============================================================
+  # Rule 13: Migration — complaints.role as plain string (not enum)
+  # ============================================================
+  - id: braga8.migration.complaints-role-not-enum
+    message: "complaints.role column is plain string — should be enum-constrained to prevent invalid role values"
+    severity: WARNING
+    languages: [php]
+    patterns:
+      - pattern-inside: |
+          Schema::create('complaints', function (Blueprint $table) {
+            ...
+          }
+      - pattern: $TABLE->string('role')
+      - pattern-not: $TABLE->enum('role', [...])
+    metadata:
+      category: security
+      cwe: "CWE-20: Improper Input Validation"
+      vulnerability: complaints-role-not-enum
+
+  # ============================================================
+  # Rule 14: Migration — complaints.reported_by as string not foreign key
+  # ============================================================
+  - id: braga8.migration.complaints-reported-by-not-fk
+    message: "complaints.reported_by is a plain string — should be foreignId referencing users table for referential integrity"
+    severity: WARNING
+    languages: [php]
+    patterns:
+      - pattern-inside: |
+          Schema::create('complaints', function (Blueprint $table) {
+            ...
+          }
+      - pattern: $TABLE->string('reported_by')
+      - pattern-not: $TABLE->foreignId('reported_by')
+    metadata:
+      category: security
+      cwe: "CWE-20: Improper Input Validation"
+      vulnerability: complaints-reported-by-not-fk
+
+  # ============================================================
+  # Rule 15: Migration — multiplier column missing default value
+  # ============================================================
+  - id: braga8.migration.multiplier-missing-default
+    message: "multiplier column added without default value — NULL multiplier may cause calculation errors"
+    severity: INFO
+    languages: [php]
+    patterns:
+      - pattern-inside: |
+          Schema::table('utility_meters', function (Blueprint $table) {
+            ...
+          }
+      - pattern: $TABLE->decimal('multiplier', ...)
+      - pattern-not: $TABLE->decimal('multiplier', ...)->default(...)
+    metadata:
+      category: correctness
+      vulnerability: multiplier-missing-default
+
+  # ============================================================
+  # Rule 16: Controller method missing policy/authorize (generic scan)
+  # Scans all controllers for resource methods missing authorization
+  # ============================================================
+  - id: braga8.controller.generic-missing-authz
+    message: "Resource controller method lacks $this->authorize() or Gate check — verify authorization is enforced via middleware/policy"
+    severity: INFO
+    languages: [php]
+    patterns:
+      - pattern-either:
+          - pattern: function pdf(...)
+          - pattern: function index(...)
+          - pattern: function create(...)
+          - pattern: function edit(...)
+      - pattern-not-inside: |
+          function $F(...) {
+            ...
+            $this->authorize(...);
+            ...
+          }
+      - pattern-not-inside: |
+          function $F(...) {
+            ...
+            Gate::authorize(...);
+            ...
+          }
+      - pattern-not-inside: |
+          function $F(...) {
+            ...
+            abort_unless(...);
+            ...
+          }
+    paths:
+      include:
+        - "**/app/Http/Controllers/**"
+    metadata:
+      category: security
+      cwe: "CWE-862: Missing Authorization"
+      vulnerability: generic-missing-authz
