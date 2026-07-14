@@ -33,13 +33,15 @@ class RegisteredUserController extends Controller
             'email' => $validated['email'],
             'phone_number' => $validated['phone_number'],
             'password' => Hash::make($validated['password']),
-            'role' => 'admin',
         ]);
+        $user->role = 'tenant';
+        $user->save();
 
         event(new Registered($user));
 
         Auth::login($user);
 
-        return redirect()->route('dashboard');
+        return redirect()->route('home')->with('status', 'Registration successful. An admin will assign your role.');
+    }
     }
 }

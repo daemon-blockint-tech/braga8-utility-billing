@@ -47,7 +47,12 @@ class UserController extends Controller
 
         $validated['password'] = bcrypt($validated['password']);
 
-        User::create($validated);
+        $role = $validated['role'];
+        unset($validated['role']);
+
+        $user = User::create($validated);
+        $user->role = $role;
+        $user->save();
 
         return redirect()->back()->with('status', 'user-stored');
     }
@@ -79,7 +84,12 @@ class UserController extends Controller
             unset($validated['password']);
         }
 
+        $role = $validated['role'];
+        unset($validated['role']);
+
         $user->update($validated);
+        $user->role = $role;
+        $user->save();
 
         return redirect()->back()->with('status', 'user-updated');
     }

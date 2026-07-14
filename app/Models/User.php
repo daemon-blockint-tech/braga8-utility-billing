@@ -19,10 +19,9 @@ class User extends Authenticatable
         'email',
         'password',
         'phone_number',
-        'role',
     ];
 
-    public function meterReadings() 
+    public function meterReadings()
     {
         return $this->hasMany(MeterReading::class);
     }

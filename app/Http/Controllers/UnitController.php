@@ -21,7 +21,7 @@ class UnitController extends Controller
                 });
             });
         })
-        ->latest() 
+        ->latest()
         ->paginate(5)
         ->withQueryString();
 
@@ -49,7 +49,7 @@ class UnitController extends Controller
             'lease_end' => 'nullable|date',
         ]);
 
-        Unit::create($request->all());
+        Unit::create($request->validated());
 
         return redirect()->route('units.index')
             ->with('success', 'Unit berhasil ditambahkan.');
@@ -73,7 +73,7 @@ class UnitController extends Controller
             'lease_end' => 'nullable|date',
         ]);
 
-        $unit->update($request->all());
+        $unit->update($request->validated());
 
         return redirect()->route('units.index')
             ->with('success', 'Unit berhasil diperbarui.');
@@ -86,7 +86,7 @@ class UnitController extends Controller
         return redirect()->route('units.index')
             ->with('success', 'Unit berhasil dihapus.');
     }
-        
+
     public function show(Unit $unit)
     {
         $unit->load('tenant');

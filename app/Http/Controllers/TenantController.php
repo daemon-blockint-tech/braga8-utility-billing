@@ -21,7 +21,7 @@ class TenantController extends Controller
         }
 
         $query->with(['units.meters.readings' => function($q) {
-            $q->orderBy('recorded_at', 'desc'); 
+            $q->orderBy('recorded_at', 'desc');
         }]);
 
         $tenants = $query->latest()->paginate(10)->withQueryString();
@@ -55,12 +55,13 @@ class TenantController extends Controller
                 'email'        => $validated['contact_email'],
                 'username'     => Str::slug($validated['person_in_charge']) . rand(10, 99),
                 'password'     => Hash::make('password123'),
-                'role'         => 'tenant',
                 'phone_number' => $validated['contact_phone'],
             ]);
+            $user->role = 'tenant';
+            $user->save();
 
             Tenant::create([
-                'user_id'          => $user->id, 
+                'user_id'          => $user->id,
                 'tenant_name'      => $validated['tenant_name'],
                 'company_name'     => $validated['company_name'],
                 'business_type'    => $validated['business_type'],
@@ -68,7 +69,7 @@ class TenantController extends Controller
                 'contact_phone'    => $validated['contact_phone'],
                 'contact_email'    => $validated['contact_email'],
             ]);
-        }); 
+        });
 
         return redirect()->route('tenants.index')->with('status', 'tenant-created');
     }
@@ -85,14 +86,14 @@ class TenantController extends Controller
         ]);
 
         return DB::transaction(function () use ($validated, $tenant) {
-            
+
             $tenant->update($validated);
 
             if ($tenant->user_id) {
                 User::where('id', $tenant->user_id)->update([
                     'name'         => $validated['person_in_charge'],
                     'email'        => $validated['contact_email'],
-                    'phone_number' => $validated['contact_phone'], 
+                    'phone_number' => $validated['contact_phone'],
                 ]);
             }
 
@@ -113,11 +114,11 @@ class TenantController extends Controller
     public function destroy(Tenant $tenant)
     {
         return DB::transaction(function () use ($tenant) {
-            
+
             if ($tenant->user_id) {
                 User::where('id', $tenant->user_id)->delete();
             }
-            
+
             $tenant->delete();
 
             return redirect()->route('tenants.index')->with('status', 'tenant-deleted');

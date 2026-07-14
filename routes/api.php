@@ -95,15 +95,15 @@ Route::get('/complaint-image/{filename}', function ($filename) {
 
 Route::middleware('auth:sanctum')->group(function () {
 
-
+// Routes available to any authenticated user (own-data scope enforced in H2).
 Route::get('/invoices/{invoice}/detail', [InvoiceSummaryController::class, 'detail']);
-Route::post('/payments', [\App\Http\Controllers\PaymentController::class, 'apiStore']);
-
+Route::get('/invoices/summary', [InvoiceSummaryController::class, 'index']);
+Route::get('/payments', [PaymentController::class, 'apiIndex']);
 
 Route::get('/tenant/profile', function (\Illuminate\Http\Request $request) {
    $tenant = $request->user()->tenant;
    if (!$tenant) return response()->json(null, 404);
-  
+
    return response()->json([
        'tenant_name'      => $tenant->tenant_name,
        'company_name'     => $tenant->company_name ?? '',
@@ -113,52 +113,81 @@ Route::get('/tenant/profile', function (\Illuminate\Http\Request $request) {
        'contact_email'    => $tenant->contact_email ?? '',
    ]);
 });
-   Route::post('/logout', [AuthController::class, 'logout']);
-   Route::post('/profile/update', [\App\Http\Controllers\UserController::class, 'updateProfile']);
+Route::post('/logout', [AuthController::class, 'logout']);
+Route::post('/profile/update', [\App\Http\Controllers\UserController::class, 'updateProfile']);
 
-   Route::get('/tenants', [TenantController::class, 'index']);
+Route::get('/units/summary', function () {
+   $thisMonth  = now()->month;
+   $thisYear   = now()->year;
+   $lastMonth  = now()->subMonth()->month;
+   $lastYear   = now()->subMonth()->year;
 
-   Route::get('/units/summary', function () {
-       $thisMonth  = now()->month;
-       $thisYear   = now()->year;
-       $lastMonth  = now()->subMonth()->month;
-       $lastYear   = now()->subMonth()->year;
+   $tenants = Tenant::with(['units.meters'])->get();
 
+   foreach ($tenants as $tenant) {
+       foreach ($tenant->units as $unit) {
+           foreach ($unit->meters as $meter) {
 
-       $tenants = Tenant::with(['units.meters'])->get();
-
-
-       foreach ($tenants as $tenant) {
-           foreach ($tenant->units as $unit) {
-               foreach ($unit->meters as $meter) {
-                  
-                   $meter->latest_reading = MeterReading::where('meter_id', $meter->id)
-                       ->whereMonth('recorded_at', $thisMonth)
-                       ->whereYear('recorded_at', $thisYear)
-                       ->orderBy('recorded_at', 'desc')
-                       ->first();
+               $meter->latest_reading = MeterReading::where('meter_id', $meter->id)
+                   ->whereMonth('recorded_at', $thisMonth)
+                   ->whereYear('recorded_at', $thisYear)
+                   ->orderBy('recorded_at', 'desc')
+                   ->first();
 
 
-                   $meter->previous_reading = MeterReading::where('meter_id', $meter->id)
-                       ->whereMonth('recorded_at', $lastMonth)
-                       ->whereYear('recorded_at', $lastYear)
-                       ->orderBy('recorded_at', 'desc')
-                       ->first();
-               }
+               $meter->previous_reading = MeterReading::where('meter_id', $meter->id)
+                   ->whereMonth('recorded_at', $lastMonth)
+                   ->whereYear('recorded_at', $lastYear)
+                   ->orderBy('recorded_at', 'desc')
+                   ->first();
            }
        }
+   }
 
-       return response()->json($tenants);
-   });
-
-Route::get('/invoices/summary',        [InvoiceSummaryController::class, 'index']);
-Route::post('/invoices/{invoice}/pay', [InvoiceSummaryController::class, 'pay']);
-
-Route::prefix("meter-analytics")->group(function () {
-   Route::get("units/summary", [App\Http\Controllers\MeterReadingController::class, "fetchUnitsSummary"]);
-
-   Route::get("units/{unit_id}/reading-history", [App\Http\Controllers\MeterReadingController::class, "fetchReadingHistory"]);
+   return response()->json($tenants);
 });
+
+Route::prefix('notifications')->group(function () {
+   Route::get('/', [NotificationController::class, 'index']);
+   Route::patch('/{notification}/read', [NotificationController::class, 'markAsRead']);
+   Route::delete('/{notification}', [NotificationController::class, 'destroy']);
+
+   Route::patch('/read-all', [NotificationController::class, 'markAllAsRead']);
+   Route::delete('/', [NotificationController::class, 'destroyAll']);
+});
+
+Route::get('/customer-care', function () {
+   return response()->json([
+       'screen' => 'customer_care',
+       'title' => 'Customer Care',
+       'subtitle' => 'Braga8 Complaint Management',
+   ]);
+});
+
+// Complaints: admin, supervisor, petugas (create), tenant (create + read own).
+// Tenant isolation is enforced in the controller (H2).
+Route::get('/complaints', [ApiComplaintController::class, 'index']);
+Route::post('/complaints', [ApiComplaintController::class, 'store']);
+Route::get('/complaints/{id}', [ApiComplaintController::class, 'show']);
+Route::put('/complaints/{id}', [ApiComplaintController::class, 'update']);
+Route::delete('/complaints/{id}', [ApiComplaintController::class, 'destroy']);
+
+// Admin + supervisor only: manage tenants, view audit logs.
+Route::middleware('role:admin,supervisor')->group(function () {
+   Route::get('/tenants', [TenantController::class, 'index']);
+   Route::get('/audit-logs', [AuditLogController::class, 'apiIndex']);
+});
+
+// Admin + supervisor + petugas: record meter readings, record payments,
+// meter analytics, meter progress.
+Route::middleware('role:admin,supervisor,petugas')->group(function () {
+   Route::post('/payments', [\App\Http\Controllers\PaymentController::class, 'apiStore']);
+   Route::post('/invoices/{invoice}/pay', [InvoiceSummaryController::class, 'pay']);
+
+   Route::prefix('meter-analytics')->group(function () {
+       Route::get('units/summary', [App\Http\Controllers\MeterReadingController::class, 'fetchUnitsSummary']);
+       Route::get('units/{unit_id}/reading-history', [App\Http\Controllers\MeterReadingController::class, 'fetchReadingHistory']);
+   });
 
    Route::prefix('readings')->group(function () {
        Route::post('/', [MeterReadingController::class, 'store']);
@@ -171,9 +200,7 @@ Route::prefix("meter-analytics")->group(function () {
            $q->orderBy('recorded_at', 'desc');
        }])->findOrFail($unitId);
 
-
        $history = [];
-
 
        foreach ($unit->meters as $meter) {
            foreach ($meter->readings as $reading) {
@@ -200,45 +227,6 @@ Route::prefix("meter-analytics")->group(function () {
    });
 
    Route::get('/meter-progress', [MeterReadingController::class, 'getMonthlyProgress']);
-
-Route::prefix('notifications')->group(function () {
-   Route::get('/', [NotificationController::class, 'index']);
-   Route::patch('/{notification}/read', [NotificationController::class, 'markAsRead']);
-   Route::delete('/{notification}', [NotificationController::class, 'destroy']);
-  
-   Route::patch('/read-all', [NotificationController::class, 'markAllAsRead']);
-   Route::delete('/', [NotificationController::class, 'destroyAll']);
-});
-   Route::get('/audit-logs', [AuditLogController::class, 'apiIndex']);
-
-
-Route::get('/complaints', [ApiComplaintController::class, 'index']);
-Route::post('/complaints', [ApiComplaintController::class, 'store']);
-Route::get('/complaints/{id}', [ApiComplaintController::class, 'show']);
-Route::put('/complaints/{id}', [ApiComplaintController::class, 'update']);
-Route::delete('/complaints/{id}', [ApiComplaintController::class, 'destroy']);
-
-Route::get('/customer-care', function () {
-   return response()->json([
-       'screen' => 'customer_care',
-       'title' => 'Customer Care',
-       'subtitle' => 'Braga8 Complaint Management',
-   ]);
-});
-Route::get('/payments', [PaymentController::class, 'apiIndex']);
-
-
-Route::get('/payments/debug', function (Request $request) {
-   $user   = $request->user();
-   $tenant = $user->tenant;
-
-
-   return response()->json([
-       'user_id'   => $user->id,
-       'tenant'    => $tenant,
-       'payment_7' => \App\Models\Payment::with('invoice')->find(7),
-       'invoice_tenant_id' => \App\Models\Payment::find(7)?->invoice?->tenant_id,
-   ]);
 });
 
 });
