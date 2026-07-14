@@ -6,7 +6,7 @@ use App\Models\Reminder;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 
-class SendReminders extends Command
+class SendReminder extends Command
 {
     protected $signature = 'reminders:send';
     protected $description = 'Send reminders based on reminder_date';

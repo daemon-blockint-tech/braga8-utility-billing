@@ -9,17 +9,21 @@ return new class extends Migration
     /**
      * Run the migrations.
      */
-   public function up()
-{
-    Schema::table('tariffs', function (Blueprint $table) {
-        $table->string('name')->after('id')->nullable(); 
-    });
-}
+    public function up()
+    {
+        if (!Schema::hasColumn('tariffs', 'name')) {
+            Schema::table('tariffs', function (Blueprint $table) {
+                $table->string('name')->after('id')->nullable();
+            });
+        }
+    }
 
-public function down()
-{
-    Schema::table('tariffs', function (Blueprint $table) {
-        $table->dropColumn('name');
-    });
-}
+    public function down()
+    {
+        if (Schema::hasColumn('tariffs', 'name')) {
+            Schema::table('tariffs', function (Blueprint $table) {
+                $table->dropColumn('name');
+            });
+        }
+    }
 };
