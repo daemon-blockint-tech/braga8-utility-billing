@@ -43,5 +43,4 @@ class RegisteredUserController extends Controller
 
         return redirect()->route('home')->with('status', 'Registration successful. An admin will assign your role.');
     }
-    }
 }
